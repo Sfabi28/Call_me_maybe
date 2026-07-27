@@ -16,6 +16,8 @@
   },
   {
     "name": "fn_greet",
+    "namehg": "fn_greet",
+
     "description": "Generate a greeting message for a person by name.",
     "parameters": {
       "name": {
