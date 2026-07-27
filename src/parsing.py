@@ -15,13 +15,15 @@ class ParseCall(BaseModel):
     prompt: str
 
 
-def parsing_definition() -> None:
+def parsing_definition() -> str | None:
     adapter = TypeAdapter(list[ParseDef])
     try:
         with open("data/input/functions_definition.json",
                   encoding="utf-8") as file:
-            res_def = adapter.validate_json(file.read())
+            f = file.read()
+            res_def = adapter.validate_json(f)
         print("json valido")
+        return f
     except FileNotFoundError:
         print("Errore: file non trovato")
         sys.exit(1)
@@ -31,7 +33,7 @@ def parsing_definition() -> None:
         sys.exit(1)
 
 
-def parsing_calling() -> None:
+def parsing_calling() -> list | None:
     adapter = TypeAdapter(list[ParseCall])
 
     try:
@@ -39,6 +41,7 @@ def parsing_calling() -> None:
                   encoding="utf-8") as file:
             res_call = adapter.validate_json(file.read())
         print("json valido")
+        return res_call
     except FileNotFoundError:
         print("Errore: file non trovato")
         sys.exit(1)
