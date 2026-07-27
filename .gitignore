@@ -1,0 +1,10 @@
+output_validator.py
+mazegen/__pycache__
+__pycache__/
+/__pycache__/
+output_maze.txt
+.venv
+ruff.toml
+configs/
+dist/
+build/
