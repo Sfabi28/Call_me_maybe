@@ -1,13 +1,16 @@
 NAME = call_me_maybe.py
 PYTHON = python3
-VENV = /sgoinfre/sfabi/.venv
+VENV = /sgoinfre/sadell-e/.venv
 BIN = $(VENV)/bin
-UV_CACHE_DIR = /sgoinfre/sfabi/uv-cache
-TMPDIR = /sgoinfre/sfabi/tmp
-HF_HOME = /sgoinfre/sfabi/hf
+UV_CACHE_DIR = /sgoinfre/sadell-e/uv-cache
+TMPDIR = /sgoinfre/sadell-e/tmp
+HF_HOME = /sgoinfre/sadell-e/hf
 HF_HUB_CACHE = $(HF_HOME)/hub
 
-install:
+dirs:
+	mkdir -p $(VENV) $(UV_CACHE_DIR) $(TMPDIR) $(HF_HOME) $(HF_HUB_CACHE)
+
+install: dirs
 	UV_PROJECT_ENVIRONMENT=$(VENV) UV_CACHE_DIR=$(UV_CACHE_DIR) TMPDIR=$(TMPDIR) uv sync --no-cache
 
 run:
