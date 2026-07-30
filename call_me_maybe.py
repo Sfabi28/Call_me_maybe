@@ -24,22 +24,18 @@ def main() -> None:
         for i in prompts:
             prompt = MESSAGE + functs + REQUEST + i.prompt + END
             inputIDs = model.encode(prompt)
-
-            while True:
+            flag: int = 0
+            while True:    #USARE CONSTRAINED DECODING
                 logits = model.get_logits_from_input_ids(inputIDs[0].tolist())
                 next_token_id = int(torch.argmax(torch.tensor(logits, device=inputIDs.device)))
-
-                inputIDs = torch.cat(
-                    [
-                        inputIDs,
-                        torch.tensor([[next_token_id]], device=inputIDs.device, dtype=inputIDs.dtype)
-                    ],
-                    dim=1,
-                )
-
+                inputIDs = torch.cat([inputIDs, torch.tensor([[next_token_id]], device=inputIDs.device,
+                                     dtype=inputIDs.dtype)], dim=1)
                 output = model.decode([next_token_id])
-                if "}" in output:
-                    break
+                if '}' in output:
+                    if flag == 0:
+                        flag = 1
+                    else:
+                        break
 
             print(model.decode(inputIDs[0].tolist()))
 

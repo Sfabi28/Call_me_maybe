@@ -14,11 +14,13 @@ install: dirs
 	UV_PROJECT_ENVIRONMENT=$(VENV) UV_CACHE_DIR=$(UV_CACHE_DIR) TMPDIR=$(TMPDIR) uv sync --no-cache
 
 run:
-	HF_HOME=$(HF_HOME) HF_HUB_CACHE=$(HF_HUB_CACHE) TMPDIR=$(TMPDIR) $(BIN)/$(PYTHON) $(NAME) # config.txt
+	CUDA_VISIBLE_DEVICES= HF_HOME=$(HF_HOME) HF_HUB_CACHE=$(HF_HUB_CACHE) TMPDIR=$(TMPDIR) $(BIN)/$(PYTHON) $(NAME) # config.txt
 
 debug:
-	HF_HOME=$(HF_HOME) HF_HUB_CACHE=$(HF_HUB_CACHE) TMPDIR=$(TMPDIR) $(BIN)/$(PYTHON) -m pdb $(NAME) # config.txt
+	CUDA_VISIBLE_DEVICES= HF_HOME=$(HF_HOME) HF_HUB_CACHE=$(HF_HUB_CACHE) TMPDIR=$(TMPDIR) $(BIN)/$(PYTHON) -m pdb $(NAME) # config.txt
 
+test:
+        $(foreach num, $(NUMBERS), CUDA_VISIBLE_DEVICES= HF_HOME=$(HF_HOME) HF_HUB_CACHE=$(HF_HUB_CACHE) TMPDIR=$(TMPDIR) $(BIN)/$(PYTHON) $(NAME) configs/config$(num).txt;)
 clean:
 	rm -rf $(VENV)
 	rm -rf __pycache__
@@ -34,9 +36,6 @@ lint-strict:
 	mypy $(NAME) mazegen --strict
 
 NUMBERS=0 1 2 3 4 5 6 7 8 9
-test:
-		$(foreach num, $(NUMBERS), HF_HOME=$(HF_HOME) HF_HUB_CACHE=$(HF_HUB_CACHE) TMPDIR=$(TMPDIR) $(BIN)/$(PYTHON) $(NAME) configs/config$(num).txt;)
-
 
 build:
 	HF_HOME=$(HF_HOME) HF_HUB_CACHE=$(HF_HUB_CACHE) TMPDIR=$(TMPDIR) $(BIN)/pip install build
