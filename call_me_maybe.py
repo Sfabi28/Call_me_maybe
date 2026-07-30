@@ -1,25 +1,30 @@
 import src
+import llm_sdk
 
 
-MESSAGE = ("Sei un assistente automatico progettato per estrarre informazioni "
-           "e chiamare funzioni. Non devi rispondere alle domande dell'utente,"
-           " ma devi solo selezionare la funzione corretta e i parametri "
-           "necessari.\nEcco la lista delle funzioni a tua disposizione, "
-           "con i rispettivi parametri e tipi di dato:\n")
+MESSAGE = ("You are an automated assistant designed to extract information "
+           "and call functions. You do not need to answer the user's questions,"
+           " but only select the correct function and the necessary parameters."
+           "\nHere is the list of functions available to you, with their respective "
+           "parameters and data types:\n")
 
-REQUEST = "\nRichiesta dell'utente: "
+REQUEST = "\nUser request: "
 
-END = ("\nGenera SOLO un oggetto JSON valido contenente le chiavi 'name' e "
-       "'parameters'. Nessun altro testo.\nRisultato:\n\n{")
+END = ("\nGenerate ONLY a valid JSON object containing the keys 'name' and "
+       "'parameters'. No other text.\nResult:\n\n{")
 
 
 def main() -> None:
     try:
         functs = src.parsing_definition()
         prompts = src.parsing_calling()
+        model = llm_sdk.Small_LLM_Model()
+
         for i in prompts:
             prompt = MESSAGE + functs + REQUEST + i.prompt + END
-            ''' for di generazione risposta'''
+            inputIDs = model.encode(prompt)
+            # print(inputIDs)
+            ''' while di generazione risposta finche non viene generata una }'''
     except Exception as e:
         print(f"Errore: {e}")
 
