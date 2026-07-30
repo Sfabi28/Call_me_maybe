@@ -1,0 +1,2 @@
+constrained decoding
+creare file output
