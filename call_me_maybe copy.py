@@ -1,4 +1,3 @@
-import torch
 import src
 import llm_sdk
 
@@ -24,25 +23,16 @@ def main() -> None:
         for i in prompts:
             prompt = MESSAGE + functs + REQUEST + i.prompt + END
             inputIDs = model.encode(prompt)
-
             while True:
-                logits = model.get_logits_from_input_ids(inputIDs[0].tolist())
-                next_token_id = int(torch.argmax(torch.tensor(logits, device=inputIDs.device)))
-
-                inputIDs = torch.cat(
-                    [
-                        inputIDs,
-                        torch.tensor([[next_token_id]], device=inputIDs.device, dtype=inputIDs.dtype)
-                    ],
-                    dim=1,
-                )
-
-                output = model.decode([next_token_id])
-                if "}" in output:
+                logits = model.get_logits_from_input_ids(inputIDs)
+                maxl: list[int]
+                maxl[0] = max(logits)
+                inputIDs = torch.cat([inputIDs, torch.tensor([maxl])], dim=1)
+                output = model.decode(maxl)
+                if '}' in output:
                     break
-
-            print(model.decode(inputIDs[0].tolist()))
-
+            output = model.decode(inputIDs)
+            print(output)
     except Exception as e:
         print(f"Errore: {e}")
 
