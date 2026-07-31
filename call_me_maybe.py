@@ -6,13 +6,13 @@ import llm_sdk
 MESSAGE = ("You are an automated assistant designed to extract information "
            "and call functions. You do not need to answer the user's questions,"
            " but only select the correct function and the necessary parameters."
-           "\nHere is the list of functions available to you, with their respective "
-           "parameters and data types:\n")
+           "\nHere is the list of functions available to you, with their respec"
+           " tive parameters and data types:\n")
 
 REQUEST = "\nUser request: "
 
 END = ("\nGenerate ONLY a valid JSON object containing the keys 'name' and "
-       "'parameters'. No other text.\nResult:\n\n{")
+       "'parameters'. No other text.\nResult:\n\n{\n")
 
 
 def main() -> None:
