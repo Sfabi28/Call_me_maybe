@@ -1,6 +1,8 @@
 import torch
 import src
 import llm_sdk
+import json
+import numpy as np
 
 
 MESSAGE = ("You are an automated assistant designed to extract information "
@@ -11,33 +13,56 @@ MESSAGE = ("You are an automated assistant designed to extract information "
 
 REQUEST = "\nUser request: "
 
-END = ("\nGenerate ONLY a valid JSON object containing the keys 'name' and "
-       "'parameters'. No other text.\nResult:\n\n{\n")
+END = ('\nGenerate ONLY a valid JSON object containing the keys "name" and '
+       '"parameters". No other text.\nResult:\n\n')
 
 
 def main() -> None:
     try:
         functs = src.parsing_definition()
+        functs_data = json.loads(functs)
         prompts = src.parsing_calling()
         model = llm_sdk.Small_LLM_Model()
+        state = src.jsonState
+        vocab_path = model.get_path_to_vocab_file()
+        with open(vocab_path, 'r', encoding='utf-8') as file:
+            vocab = json.load(file)
 
         for i in prompts:
-            prompt = MESSAGE + functs + REQUEST + i.prompt + END
-            inputIDs = model.encode(prompt)
-            flag: int = 0
-            while True:    #USARE CONSTRAINED DECODING
-                logits = model.get_logits_from_input_ids(inputIDs[0].tolist())
-                next_token_id = int(torch.argmax(torch.tensor(logits, device=inputIDs.device)))
-                inputIDs = torch.cat([inputIDs, torch.tensor([[next_token_id]], device=inputIDs.device,
-                                     dtype=inputIDs.dtype)], dim=1)
-                output = model.decode([next_token_id])
-                if '}' in output:
-                    if flag == 0:
-                        flag = 1
-                    else:
-                        break
+            curr_prompt: str = f'"{i.prompt}",\n'
+            output: str = '{\n"prompt": ' + curr_prompt
+            state_output: str = ''
+            prompt: str = MESSAGE + functs + REQUEST + i.prompt + END + output
+            inputIDs = model.encode(prompt).tolist()[0]
+            
+            current_state: src.jsonState = state.AWAITING_NAME_KEY
+            func_name = ""
+            param_name = ""
 
-            print(model.decode(inputIDs[0].tolist()))
+            while current_state != state.AWAITING_CLOSING_BRACKET:
+                best_tokenId = src.constrained_decoding(func_name, vocab, functs_data, current_state,
+                                                        param_name, inputIDs, model, state_output)
+                token_str = model.decode(best_tokenId)
+                output += token_str
+                state_output += token_str
+
+                if current_state == state.AWAITING_NAME:
+                    func_name = func_name + token_str
+                    func_name = func_name.replace(',', '').replace('"', '').replace('\n', '')
+
+                if current_state == state.AWAITING_PARAMETERS_NAME:
+                    param_name = param_name + token_str
+                    param_name = param_name.replace(',', '').replace('"', '').replace('\n', '')
+
+                inputIDs = inputIDs + [best_tokenId]
+                new_state = src.update_state(current_state, state_output)
+                if new_state != current_state:
+                    state_output = ''
+                current_state = new_state
+                print(current_state)
+                print(output)
+
+        print(output)
 
     except Exception as e:
         print(f"Errore: {e}")

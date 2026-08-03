@@ -1,12 +1,12 @@
 from pydantic import BaseModel, ValidationError, TypeAdapter, ConfigDict
 from enum import Enum
+import math
 
 
 class jsonState(Enum):
     '''
         macchina a stati per sapere sempre dove siamo nel codice
     '''
-    AWAITING_BRACKET = 0 # '{\n'
     AWAITING_NAME_KEY = 1 # '"name": '
     AWAITING_NAME = 2 # '"fn_add_numbers",\n'
     AWAITING_PARAMETERS_KEY = 3 # '"parameters": '
@@ -14,7 +14,46 @@ class jsonState(Enum):
     AWAITING_PARAMETERS_NAME = 5 #'"a": '
     AWAITING_PARAMETERS_VALUE = 6 # ', ' OR '}\n'
     AWAITING_CLOSING_BRACKET = 7 # '}'
+
+
+def constrained_decoding(chosen_function, vocab, functions, current_state, current_par_name, inputIDs, model, output):
+    '''
+        funzione che restituisce il logit corretto in base al constrained decoding
+    '''
+    logits = model.get_logits_from_input_ids(inputIDs)
+    valid_targets = get_valid_targets(current_state, functions, chosen_function, current_par_name)
+    has_value_text = bool(output.strip())
     
+    for token_id in range(len(logits)):
+        token_text = model.decode(token_id)
+        simulated_text = output + token_text
+        is_valid = False
+
+        for target in valid_targets:
+            if current_state == jsonState.AWAITING_PARAMETERS_VALUE and not has_value_text and target in [', ', '}\n']:
+                continue
+            
+            if target == "<NUMBER_PATTERN>":
+                if token_text.isdigit() or token_text.strip() in ['-', '.'] or token_text in [', ', '}\n']:
+                    is_valid = True
+                    break
+                    
+            elif target == "<STRING_PATTERN>":
+                is_valid = True
+                break
+                
+            else:
+                if target.startswith(simulated_text) or simulated_text.startswith(target):
+                    is_valid = True
+                    break
+
+        if not is_valid:
+            logits[token_id] = -math.inf
+
+    winning_token_id = logits.index(max(logits))
+
+    return winning_token_id
+
 
 def update_state(current_state: jsonState, current_text: str) -> jsonState:
 
@@ -23,52 +62,48 @@ def update_state(current_state: jsonState, current_text: str) -> jsonState:
     '''
 
 
+    normalized_text = current_text
+
     match current_state:
-        case jsonState.AWAITING_BRACKET:
-            if current_text == "{\n":
-                return jsonState.AWAITING_NAME_KEY
-                
         case jsonState.AWAITING_NAME_KEY:
-            if current_text.endswith('"name": '):
+            if normalized_text.endswith('"name": '):
                 return jsonState.AWAITING_NAME
                 
         case jsonState.AWAITING_NAME:
-            if current_text.endswith('",\n'):
+            if normalized_text.endswith('",\n'):
                 return jsonState.AWAITING_PARAMETERS_KEY
                 
         case jsonState.AWAITING_PARAMETERS_KEY:
-            if current_text.endswith('"parameters": '):
+            if normalized_text.endswith('"parameters": '):
                 return jsonState.AWAITING_PARAMETERS_BRACKET
                 
         case jsonState.AWAITING_PARAMETERS_BRACKET:
-            if current_text.endswith('{ '):
+            if normalized_text.endswith('{ '):
                 return jsonState.AWAITING_PARAMETERS_NAME
             
         case jsonState.AWAITING_PARAMETERS_NAME:
-            if current_text.endswith('": '):
+            if normalized_text.endswith('": '):
                 return jsonState.AWAITING_PARAMETERS_VALUE
 
         case jsonState.AWAITING_PARAMETERS_VALUE:
-             if current_text.endswith(', '):
+             if normalized_text.endswith(', '):
                  return jsonState.AWAITING_PARAMETERS_NAME
-             elif current_text.endswith('}\n'):
+             elif normalized_text.endswith('}\n'):
                  return jsonState.AWAITING_CLOSING_BRACKET
                  
         case jsonState.AWAITING_CLOSING_BRACKET:
-             if current_text.endswith('}'):
+             if normalized_text.endswith('}'):
                  return current_state
                 
     return current_state
 
 
-def get_valid_targets(current_state: jsonState, available_functions: list, chosen_function_name: str = None, current_param_name: str = None) -> list[str]:
+def get_valid_targets(current_state: jsonState, available_functions: list[dict], chosen_function_name: str = None, current_param_name: str = None) -> list[str]:
     '''
         funzione che restituisce una lista di quello che l'AI puo' generare, servira' per gestire i logits con constrained decoding
     '''
     match current_state:
-        case jsonState.AWAITING_BRACKET:
-            return ["{\n"]
-                
+
         case jsonState.AWAITING_NAME_KEY:
             return ['"name": ']
                 
