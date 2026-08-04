@@ -5,27 +5,23 @@ import json
 import numpy as np
 
 
-MESSAGE = ("You are an automated assistant designed to extract information "
-           "and call functions. You do not need to answer the user's questions,"
-           " but only select the correct function and the necessary parameters."
-           " You have to keep the same parameters names."
-           " IMPORTANT: parameter values must be extracted EXACTLY as they appear"
-           " in the user request below. Never use placeholder values like 'user'"
-           " or 'name' — always copy the specific word or number the user provided."
-           "\nHere is the list of functions available to you, with their respec"
-           " tive parameters and data types:\n")
+MESSAGE = (
+    "You are an automated assistant designed to extract information "
+    "and call functions. You do not need to answer the user's questions,"
+    " but only select the correct function and the necessary parameters."
+    " You have to keep the same parameters names."
+    " IMPORTANT: parameter values must be extracted EXACTLY as they appear"
+    " in the user request below. Never use placeholder values like 'user'"
+    " or 'name' — always copy the specific word or number the user provided."
+    "\nHere is the list of functions available to you, with their respec"
+    " tive parameters and data types, REMEMBER that number is a float so it needs a .:\n")
 
-FEW_SHOT_EXAMPLES = (
-    '\nExample 1:\n'
-    'User request: Greet Mary\n'
-    'Result:\n'
-    '{\n"prompt": "Greet Mary",\n"name": "fn_greet",\n"parameters": {"name": "Mary"}\n}\n'
-    '\nExample 2:\n'
-    'User request: What is the sum of 10 and 20?\n'
-    'Result:\n'
-    '{\n"prompt": "What is the sum of 10 and 20?",\n"name": "fn_add_numbers",\n'
-    '"parameters": {"a": 10.0, "b": 20.0}\n}\n'
-)
+EXAMPLES = (
+    '\nExample 1:\nUser request: Greet Mary\nResult:\n{\n"prompt": "Greet Mary'
+    '",\n"name": "fn_greet",\n"parameters": {"name": "Mary"}\n}\n\nExample 2:'
+    '\nUser request: What is the sum of 10 and 20?\nResult:\n{\n"prompt": '
+    '"What is the sum of 10 and 20?",\n"name": "fn_add_numbers",\n'
+    '"parameters": {"a": 10.0, "b": 20.0}\n}\n')
 
 REQUEST = "\nUser request: "
 
@@ -48,9 +44,10 @@ def main() -> None:
             curr_prompt: str = f'"{i.prompt}",\n'
             output: str = '{\n"prompt": ' + curr_prompt
             state_output: str = ''
-            prompt: str = MESSAGE + functs + FEW_SHOT_EXAMPLES + REQUEST + i.prompt + END + output
+            prompt: str = (MESSAGE + functs + EXAMPLES + REQUEST + i.prompt +
+                           END + output)
             inputIDs = model.encode(prompt).tolist()[0]
-            
+
             current_state: src.jsonState = state.AWAITING_NAME_KEY
             func_name = ""
             param_name = ""
@@ -58,7 +55,7 @@ def main() -> None:
 
             while True:
                 best_tokenId = src.constrained_decoding(func_name, vocab, functs_data, current_state,
-                                                        param_name, inputIDs, model, state_output, used_params)
+                                                        param_name, inputIDs, model, state_output, i.prompt, used_params)
                 token_str = model.decode(best_tokenId)
                 output += token_str
                 state_output += token_str
