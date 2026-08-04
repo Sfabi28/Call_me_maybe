@@ -1,6 +1,9 @@
 from pydantic import BaseModel, ValidationError, TypeAdapter, ConfigDict
 from enum import Enum
 import math
+import string
+
+
 
 
 class jsonState(Enum):
@@ -16,14 +19,17 @@ class jsonState(Enum):
     AWAITING_CLOSING_BRACKET = 7 # '}'
 
 
-def constrained_decoding(chosen_function, vocab, functions, current_state, current_par_name, inputIDs, model, output, used_params=None):
+def constrained_decoding(chosen_function, vocab, functions, current_state,
+                         current_par_name, inputIDs, model, output, prompt,
+                         used_params=None):
     '''
-        funzione che restituisce il logit corretto in base al constrained decoding
+    funzione che restituisce il logit corretto in base al constrained decoding
     '''
     logits = model.get_logits_from_input_ids(inputIDs)
     valid_targets = get_valid_targets(current_state, functions, chosen_function, current_par_name, used_params)
     has_value_text = bool(output.strip())
-    
+    valid_prompt = [w.strip(string.punctuation) for w in prompt.split()]
+
     for token_id in range(len(logits)):
         token_text = model.decode(token_id)
         simulated_text = output + token_text
@@ -33,26 +39,38 @@ def constrained_decoding(chosen_function, vocab, functions, current_state, curre
             is_closing_target = target in [', ', '}\n'] or target.startswith('}')
             if current_state == jsonState.AWAITING_PARAMETERS_VALUE and not has_value_text and is_closing_target:
                 continue
-            
+
             if target == "<NUMBER_PATTERN>":
                 if ',' not in output and '}' not in output:
                     if token_text.strip().isdigit() or token_text.strip() in ['-', '.']:
                         is_valid = True
                         break
-                    
+
             elif target == "<STRING_PATTERN>":
                 quote_count = output.count('"')
 
                 if quote_count == 0:
                     if token_text.startswith('"') and token_text.count('"') <= 1:
-                        is_valid = True
+                        candidate = token_text[1:].replace('"', '')
+                        if candidate == '' or candidate in prompt:
+                            is_valid = True
+                            break
 
                 elif quote_count == 1:
                     if '\n' not in token_text:
+                        content_so_far = output[output.index('"') + 1:]
+
                         if token_text.count('"') == 0:
-                            is_valid = True
+                            candidate = content_so_far + token_text
+                            if candidate in prompt:
+                                is_valid = True
+                                break
+
                         elif token_text.count('"') == 1 and token_text.rstrip().endswith('"'):
-                            is_valid = True
+                            candidate = content_so_far + token_text.rstrip()[:-1]
+                            if candidate in prompt:
+                                is_valid = True
+                                break
                 
             else:
                 if current_state == jsonState.AWAITING_PARAMETERS_VALUE:
@@ -177,7 +195,11 @@ def get_valid_targets(current_state: jsonState, available_functions: list[dict],
             
             if chosen_func_data and "parameters" in chosen_func_data:
                 param_names = list(chosen_func_data["parameters"].keys())
-                is_last_param = current_param_name == param_names[-1]
+                already_used = set(used_params or [])
+                remaining = [p for p in param_names 
+                            if p != current_param_name and p not in already_used]
+                is_last_param = len(remaining) == 0
+                
                 targets.append(', ')
                 if is_last_param:
                     targets.append('}\n}')
@@ -185,7 +207,7 @@ def get_valid_targets(current_state: jsonState, available_functions: list[dict],
                 param_info = chosen_func_data["parameters"].get(current_param_name)
                 if param_info:
                     param_type = param_info.get("type")
-                    if param_type == "number":
+                    if param_type in ("number", "integer", "boolean"):
                         targets.append("<NUMBER_PATTERN>") 
                     elif param_type == "string":
                         targets.append("<STRING_PATTERN>")
