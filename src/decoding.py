@@ -185,7 +185,7 @@ def get_valid_targets(current_state: jsonState, available_functions: list[dict],
                 param_info = chosen_func_data["parameters"].get(current_param_name)
                 if param_info:
                     param_type = param_info.get("type")
-                    if param_type == "number":
+                    if param_type in ("number", "integer", "bool"):
                         targets.append("<NUMBER_PATTERN>") 
                     elif param_type == "string":
                         targets.append("<STRING_PATTERN>")
