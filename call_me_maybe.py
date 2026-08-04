@@ -8,8 +8,24 @@ import numpy as np
 MESSAGE = ("You are an automated assistant designed to extract information "
            "and call functions. You do not need to answer the user's questions,"
            " but only select the correct function and the necessary parameters."
+           " You have to keep the same parameters names."
+           " IMPORTANT: parameter values must be extracted EXACTLY as they appear"
+           " in the user request below. Never use placeholder values like 'user'"
+           " or 'name' — always copy the specific word or number the user provided."
            "\nHere is the list of functions available to you, with their respec"
            " tive parameters and data types:\n")
+
+FEW_SHOT_EXAMPLES = (
+    '\nExample 1:\n'
+    'User request: Greet Mary\n'
+    'Result:\n'
+    '{\n"prompt": "Greet Mary",\n"name": "fn_greet",\n"parameters": {"name": "Mary"}\n}\n'
+    '\nExample 2:\n'
+    'User request: What is the sum of 10 and 20?\n'
+    'Result:\n'
+    '{\n"prompt": "What is the sum of 10 and 20?",\n"name": "fn_add_numbers",\n'
+    '"parameters": {"a": 10.0, "b": 20.0}\n}\n'
+)
 
 REQUEST = "\nUser request: "
 
@@ -32,37 +48,42 @@ def main() -> None:
             curr_prompt: str = f'"{i.prompt}",\n'
             output: str = '{\n"prompt": ' + curr_prompt
             state_output: str = ''
-            prompt: str = MESSAGE + functs + REQUEST + i.prompt + END + output
+            prompt: str = MESSAGE + functs + FEW_SHOT_EXAMPLES + REQUEST + i.prompt + END + output
             inputIDs = model.encode(prompt).tolist()[0]
             
             current_state: src.jsonState = state.AWAITING_NAME_KEY
             func_name = ""
             param_name = ""
+            used_params: list[str] = []
 
-            while current_state != state.AWAITING_CLOSING_BRACKET:
+            while True:
                 best_tokenId = src.constrained_decoding(func_name, vocab, functs_data, current_state,
-                                                        param_name, inputIDs, model, state_output)
+                                                        param_name, inputIDs, model, state_output, used_params)
                 token_str = model.decode(best_tokenId)
                 output += token_str
                 state_output += token_str
 
                 if current_state == state.AWAITING_NAME:
                     func_name = func_name + token_str
-                    func_name = func_name.replace(',', '').replace('"', '').replace('\n', '')
+                    func_name = func_name.replace(',', '').replace('"', '').replace('\n', '').strip()
 
                 if current_state == state.AWAITING_PARAMETERS_NAME:
                     param_name = param_name + token_str
-                    param_name = param_name.replace(',', '').replace('"', '').replace('\n', '')
+                    param_name = param_name.replace(',', '').replace('"', '').replace('\n', '').replace(':', '').strip()
+
+                if current_state == state.AWAITING_CLOSING_BRACKET:
+                    break
 
                 inputIDs = inputIDs + [best_tokenId]
                 new_state = src.update_state(current_state, state_output)
                 if new_state != current_state:
+                    if current_state == state.AWAITING_PARAMETERS_NAME:
+                        used_params.append(param_name)
                     state_output = ''
+                    if new_state == state.AWAITING_PARAMETERS_NAME:
+                        param_name = ''
                 current_state = new_state
-                print(current_state)
-                print(output)
-
-        print(output)
+            print(output)
 
     except Exception as e:
         print(f"Errore: {e}")

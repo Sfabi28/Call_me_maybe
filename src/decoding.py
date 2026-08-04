@@ -16,12 +16,12 @@ class jsonState(Enum):
     AWAITING_CLOSING_BRACKET = 7 # '}'
 
 
-def constrained_decoding(chosen_function, vocab, functions, current_state, current_par_name, inputIDs, model, output):
+def constrained_decoding(chosen_function, vocab, functions, current_state, current_par_name, inputIDs, model, output, used_params=None):
     '''
         funzione che restituisce il logit corretto in base al constrained decoding
     '''
     logits = model.get_logits_from_input_ids(inputIDs)
-    valid_targets = get_valid_targets(current_state, functions, chosen_function, current_par_name)
+    valid_targets = get_valid_targets(current_state, functions, chosen_function, current_par_name, used_params)
     has_value_text = bool(output.strip())
     
     for token_id in range(len(logits)):
@@ -30,22 +30,42 @@ def constrained_decoding(chosen_function, vocab, functions, current_state, curre
         is_valid = False
 
         for target in valid_targets:
-            if current_state == jsonState.AWAITING_PARAMETERS_VALUE and not has_value_text and target in [', ', '}\n']:
+            is_closing_target = target in [', ', '}\n'] or target.startswith('}')
+            if current_state == jsonState.AWAITING_PARAMETERS_VALUE and not has_value_text and is_closing_target:
                 continue
             
             if target == "<NUMBER_PATTERN>":
-                if token_text.isdigit() or token_text.strip() in ['-', '.'] or token_text in [', ', '}\n']:
-                    is_valid = True
-                    break
+                if ',' not in output and '}' not in output:
+                    if token_text.strip().isdigit() or token_text.strip() in ['-', '.']:
+                        is_valid = True
+                        break
                     
             elif target == "<STRING_PATTERN>":
-                is_valid = True
-                break
+                quote_count = output.count('"')
+
+                if quote_count == 0:
+                    if token_text.startswith('"') and token_text.count('"') <= 1:
+                        is_valid = True
+
+                elif quote_count == 1:
+                    if '\n' not in token_text:
+                        if token_text.count('"') == 0:
+                            is_valid = True
+                        elif token_text.count('"') == 1 and token_text.rstrip().endswith('"'):
+                            is_valid = True
                 
             else:
-                if target.startswith(simulated_text) or simulated_text.startswith(target):
-                    is_valid = True
-                    break
+                if current_state == jsonState.AWAITING_PARAMETERS_VALUE:
+                    if target.startswith(token_text):
+                        is_valid = True
+                        break
+                    elif any(simulated_text.endswith(target[:i]) for i in range(1, len(target) + 1)):
+                        is_valid = True
+                        break
+                else:
+                    if target.startswith(simulated_text):
+                        is_valid = True
+                        break
 
         if not is_valid:
             logits[token_id] = -math.inf
@@ -66,39 +86,43 @@ def update_state(current_state: jsonState, current_text: str) -> jsonState:
 
     match current_state:
         case jsonState.AWAITING_NAME_KEY:
-            if normalized_text.endswith('"name": '):
+            if '"name": ' in normalized_text:
                 return jsonState.AWAITING_NAME
                 
         case jsonState.AWAITING_NAME:
-            if normalized_text.endswith('",\n'):
+            if '",\n' in normalized_text:
                 return jsonState.AWAITING_PARAMETERS_KEY
                 
         case jsonState.AWAITING_PARAMETERS_KEY:
-            if normalized_text.endswith('"parameters": '):
+            if '"parameters": ' in normalized_text:
                 return jsonState.AWAITING_PARAMETERS_BRACKET
                 
         case jsonState.AWAITING_PARAMETERS_BRACKET:
-            if normalized_text.endswith('{ '):
+            if '{' in normalized_text:
                 return jsonState.AWAITING_PARAMETERS_NAME
             
         case jsonState.AWAITING_PARAMETERS_NAME:
-            if normalized_text.endswith('": '):
+            if '": ' in normalized_text:
                 return jsonState.AWAITING_PARAMETERS_VALUE
 
         case jsonState.AWAITING_PARAMETERS_VALUE:
-             if normalized_text.endswith(', '):
-                 return jsonState.AWAITING_PARAMETERS_NAME
-             elif normalized_text.endswith('}\n'):
-                 return jsonState.AWAITING_CLOSING_BRACKET
+            quote_count = normalized_text.count('"')
+            if quote_count % 2 == 1:
+                return current_state
+
+            if ', ' in normalized_text:
+                return jsonState.AWAITING_PARAMETERS_NAME
+            elif '}' in normalized_text:
+                return jsonState.AWAITING_CLOSING_BRACKET
                  
         case jsonState.AWAITING_CLOSING_BRACKET:
-             if normalized_text.endswith('}'):
+             if '}' in normalized_text:
                  return current_state
                 
     return current_state
 
 
-def get_valid_targets(current_state: jsonState, available_functions: list[dict], chosen_function_name: str = None, current_param_name: str = None) -> list[str]:
+def get_valid_targets(current_state: jsonState, available_functions: list[dict], chosen_function_name: str = None, current_param_name: str = None, used_params: str = None) -> list[str]:
     '''
         funzione che restituisce una lista di quello che l'AI puo' generare, servira' per gestire i logits con constrained decoding
     '''
@@ -117,9 +141,9 @@ def get_valid_targets(current_state: jsonState, available_functions: list[dict],
             return ['"parameters": ']
                 
         case jsonState.AWAITING_PARAMETERS_BRACKET:
-            return ['{ ']
+            return ['{']
             
-        case jsonState.AWAITING_PARAMETERS_NAME:    ##############################
+        case jsonState.AWAITING_PARAMETERS_NAME:
             if not chosen_function_name:
                 return []
                 
@@ -134,13 +158,13 @@ def get_valid_targets(current_state: jsonState, available_functions: list[dict],
                 
             targets = []
             for param_name in chosen_func_data["parameters"].keys():
+                if used_params and param_name in used_params:
+                    continue
                 targets.append(f'"{param_name}": ')
             return targets
 
-        case jsonState.AWAITING_PARAMETERS_VALUE:  ###############################
+        case jsonState.AWAITING_PARAMETERS_VALUE:
             targets = []
-            targets.append(', ')
-            targets.append('}\n')
             
             if not chosen_function_name or not current_param_name:
                 return targets
@@ -152,6 +176,12 @@ def get_valid_targets(current_state: jsonState, available_functions: list[dict],
                     break
             
             if chosen_func_data and "parameters" in chosen_func_data:
+                param_names = list(chosen_func_data["parameters"].keys())
+                is_last_param = current_param_name == param_names[-1]
+                targets.append(', ')
+                if is_last_param:
+                    targets.append('}\n}')
+
                 param_info = chosen_func_data["parameters"].get(current_param_name)
                 if param_info:
                     param_type = param_info.get("type")
@@ -159,7 +189,7 @@ def get_valid_targets(current_state: jsonState, available_functions: list[dict],
                         targets.append("<NUMBER_PATTERN>") 
                     elif param_type == "string":
                         targets.append("<STRING_PATTERN>")
-                        
+            
             return targets
                  
         case jsonState.AWAITING_CLOSING_BRACKET:
