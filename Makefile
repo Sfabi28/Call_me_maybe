@@ -1,10 +1,10 @@
 NAME = call_me_maybe.py
 PYTHON = python3
-VENV = /sgoinfre/sadell-e/.venv
+VENV = /sgoinfre/sfabi/.venv
 BIN = $(VENV)/bin
-UV_CACHE_DIR = /sgoinfre/sadell-e/uv-cache
-TMPDIR = /sgoinfre/sadell-e/tmp
-HF_HOME = /sgoinfre/sadell-e/hf
+UV_CACHE_DIR = /sgoinfre/sfabi/uv-cache
+TMPDIR = /sgoinfre/sfabi/tmp
+HF_HOME = /sgoinfre/sfabi/hf
 HF_HUB_CACHE = $(HF_HOME)/hub
 
 dirs:

@@ -19,7 +19,7 @@ class jsonState(Enum):
     AWAITING_CLOSING_BRACKET = 7 # '}'
 
 
-def constrained_decoding(chosen_function, vocab, functions, current_state,
+def constrained_decoding(chosen_function, id_to_token, functions, current_state,
                          current_par_name, inputIDs, model, output, prompt,
                          used_params=None):
     '''
@@ -29,9 +29,9 @@ def constrained_decoding(chosen_function, vocab, functions, current_state,
     valid_targets = get_valid_targets(current_state, functions, chosen_function, current_par_name, used_params)
     has_value_text = bool(output.strip())
     valid_prompt = [w.strip(string.punctuation) for w in prompt.split()]
-
+    
     for token_id in range(len(logits)):
-        token_text = model.decode(token_id)
+        token_text = id_to_token[token_id]
         simulated_text = output + token_text
         is_valid = False
 
@@ -66,14 +66,17 @@ def constrained_decoding(chosen_function, vocab, functions, current_state,
                                 is_valid = True
                                 break
 
-                        elif token_text.count('"') == 1 and token_text.rstrip().endswith('"'):
-                            candidate = content_so_far + token_text.rstrip()[:-1]
+                        elif token_text.count('"') == 1 and token_text.endswith('"'):
+                            candidate = content_so_far + token_text[:-1]
                             if candidate in prompt:
                                 is_valid = True
                                 break
                 
             else:
                 if current_state == jsonState.AWAITING_PARAMETERS_VALUE:
+                    quote_count = output.count('"')
+                    if quote_count % 2 == 1:
+                        continue
                     if target.startswith(token_text):
                         is_valid = True
                         break
