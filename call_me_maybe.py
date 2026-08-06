@@ -43,7 +43,7 @@ def main() -> None:
         id_to_token = {tid: model.decode(tid) for tid in range(vocab_size)}
 
         for i in prompts:
-            curr_prompt: str = f'"{i.prompt}",\n'
+            curr_prompt: str = f'{json.dumps(i.prompt)},\n' # non so se devo usare json.dumps
             output: str = '{\n"prompt": ' + curr_prompt
             state_output: str = ''
             prompt: str = (MESSAGE + functs + EXAMPLES + REQUEST + i.prompt +
@@ -82,7 +82,7 @@ def main() -> None:
                     if new_state == state.AWAITING_PARAMETERS_NAME:
                         param_name = ''
                 current_state = new_state
-                print(output)
+                #print(output)
             print(output)
 
     except Exception as e:

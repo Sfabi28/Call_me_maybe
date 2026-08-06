@@ -18,6 +18,27 @@ class jsonState(Enum):
     AWAITING_PARAMETERS_VALUE = 6 # ', ' OR '}\n'
     AWAITING_CLOSING_BRACKET = 7 # '}'
 
+def _count_unescaped_quotes(text: str) -> int:
+    count = 0
+    escaped = False
+    for ch in text:
+        if escaped:
+            escaped = False
+            continue
+        if ch == '\\':
+            escaped = True
+            continue
+        if ch == '"':
+            count += 1
+    return count
+
+def _normalize_for_match(text: str) -> str:
+    return (
+        text
+        .replace('\\"', '"')
+        .replace("\\'", "'")
+        .replace('\\\\', '\\')
+    )
 
 def constrained_decoding(chosen_function, id_to_token, functions, current_state,
                          current_par_name, inputIDs, model, output, prompt,
@@ -47,34 +68,45 @@ def constrained_decoding(chosen_function, id_to_token, functions, current_state,
                         break
 
             elif target == "<STRING_PATTERN>":
-                quote_count = output.count('"')
+                quote_count = _count_unescaped_quotes(output)
+
+                if '\n' in token_text:
+                    continue
+
+                tentative = output + token_text
+                tentative_quote_count = _count_unescaped_quotes(tentative)
+
+                if tentative_quote_count > 2:
+                    continue
 
                 if quote_count == 0:
-                    if token_text.startswith('"') and token_text.count('"') <= 1:
-                        candidate = token_text[1:].replace('"', '')
-                        if candidate == '' or candidate in prompt:
+                    if not token_text.startswith('"'):
+                        continue
+
+                normalized_prompt = _normalize_for_match(prompt)
+                normalized_tentative = _normalize_for_match(tentative)
+
+                first_quote = normalized_tentative.find('"')
+                if first_quote == -1:
+                    continue
+
+                if tentative_quote_count == 1:
+                    candidate = normalized_tentative[first_quote + 1:]
+                    if candidate == "" or candidate in normalized_prompt:
+                        is_valid = True
+                        break
+
+                elif tentative_quote_count == 2:
+                    last_quote = normalized_tentative.rfind('"')
+                    if last_quote > first_quote:
+                        candidate = normalized_tentative[first_quote + 1:last_quote]
+                        if candidate in normalized_prompt:
                             is_valid = True
                             break
-
-                elif quote_count == 1:
-                    if '\n' not in token_text:
-                        content_so_far = output[output.index('"') + 1:]
-
-                        if token_text.count('"') == 0:
-                            candidate = content_so_far + token_text
-                            if candidate in prompt:
-                                is_valid = True
-                                break
-
-                        elif token_text.count('"') == 1 and token_text.endswith('"'):
-                            candidate = content_so_far + token_text[:-1]
-                            if candidate in prompt:
-                                is_valid = True
-                                break
                 
             else:
                 if current_state == jsonState.AWAITING_PARAMETERS_VALUE:
-                    quote_count = output.count('"')
+                    quote_count = _count_unescaped_quotes(output)
                     if quote_count % 2 == 1:
                         continue
                     if target.startswith(token_text):
@@ -127,7 +159,7 @@ def update_state(current_state: jsonState, current_text: str) -> jsonState:
                 return jsonState.AWAITING_PARAMETERS_VALUE
 
         case jsonState.AWAITING_PARAMETERS_VALUE:
-            quote_count = normalized_text.count('"')
+            quote_count = _count_unescaped_quotes(normalized_text)
             if quote_count % 2 == 1:
                 return current_state
 
