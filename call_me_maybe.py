@@ -6,50 +6,27 @@ import numpy as np
 
 
 MESSAGE = (
-    "You are an automated function-calling assistant. Your only task is to "
-    "read a user request and produce a JSON object describing which function "
-    "to call and with which parameters. You do not answer the user's question "
-    "and you do not explain your reasoning.\n"
-    "\n"
-    "Rules:\n"
-    "1. Choose exactly one function from the list below that best matches the "
-    "user's request.\n"
-    "2. Use the EXACT parameter names defined for that function — do not "
-    "rename, translate, or omit them.\n"
-    "3. Extract every parameter value EXACTLY as it appears in the user "
-    "request. Never invent, guess, or substitute a placeholder such as "
-    "'user' or 'name' — always copy the specific word, phrase, or number "
-    "the user actually provided.\n"
-    "4. If a value in the user request is wrapped in single quotes, copy "
-    "only the text inside the quotes, without the quotes themselves.\n"
-    "5. Values for parameters of type 'number' must always be written as "
-    "floats (e.g. 10 -> 10.0). Values for parameters of type 'integer' must "
-    "be written as plain integers (e.g. 10, not 10.0).\n"
-    "6. Output nothing except the JSON object — no explanations, no extra "
-    "text before or after it.\n"
-    "\n"
-    "Here is the list of functions available to you, with their parameters "
-    "and expected data types:\n"
-)
+    "You are an automated assistant designed to extract information "
+    "and call functions. You do not need to answer the user's questions,"
+    " but only select the correct function and the necessary parameters."
+    " You have to keep the same parameters names."
+    " IMPORTANT: parameter values must be extracted EXACTLY as they appear"
+    " in the user request below. Never use placeholder values like 'user'"
+    " or 'name' — always copy the specific word or number the user provided."
+    "\nHere is the list of functions available to you, with their respec"
+    " tive parameters and data types, REMEMBER that number is a float so it needs a .:\n")
 
 EXAMPLES = (
     '\nExample 1:\nUser request: Greet Mary\nResult:\n{\n"prompt": "Greet Mary'
-    '",\n"name": "fn_greet",\n"parameters": {"name": "Mary"}\n}\n\n'
-    'Example 2:\nUser request: What is the sum of 10 and 20?\nResult:\n{\n"prompt": '
+    '",\n"name": "fn_greet",\n"parameters": {"name": "Mary"}\n}\n\nExample 2:'
+    '\nUser request: What is the sum of 10 and 20?\nResult:\n{\n"prompt": '
     '"What is the sum of 10 and 20?",\n"name": "fn_add_numbers",\n'
-    '"parameters": {"a": 10.0, "b": 20.0}\n}\n\n'
-    "Example 3:\nUser request: Look up the record with id 'ABC-123'\nResult:\n"
-    '{\n"prompt": "Look up the record with id \'ABC-123\'",\n'
-    '"name": "fn_lookup_record",\n"parameters": {"id": "ABC-123"}\n}\n'
-)
+    '"parameters": {"a": 10.0, "b": 20.0}\n}\n')
 
-REQUEST = "\nNow do the same for this new request.\nUser request: "
+REQUEST = "\nUser request: "
 
-END = (
-    "\nRemember: output ONLY a single valid JSON object with exactly the "
-    'keys "name" and "parameters", matching the format shown in the '
-    "examples above. No explanations, no markdown, no extra text.\nResult:\n\n"
-)
+END = ('\nGenerate ONLY a valid JSON object containing the keys "name" and '
+       '"parameters". No other text.\nResult:\n\n')
 
 
 def main() -> None:
@@ -105,7 +82,7 @@ def main() -> None:
                     if new_state == state.AWAITING_PARAMETERS_NAME:
                         param_name = ''
                 current_state = new_state
-                # print(output)
+                print(output)
             print(output)
 
     except Exception as e:
