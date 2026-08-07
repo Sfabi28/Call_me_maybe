@@ -82,7 +82,7 @@ def main() -> None:
                     if new_state == state.AWAITING_PARAMETERS_NAME:
                         param_name = ''
                 current_state = new_state
-                #print(output)
+                print(output)
             print(output)
 
     except Exception as e:
