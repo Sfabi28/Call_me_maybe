@@ -1,8 +1,6 @@
-import torch
 import src
 import llm_sdk
 import json
-import numpy as np
 
 
 MESSAGE = (
@@ -14,7 +12,8 @@ MESSAGE = (
     " in the user request below. Never use placeholder values like 'user'"
     " or 'name' — always copy the specific word or number the user provided."
     "\nHere is the list of functions available to you, with their respec"
-    " tive parameters and data types, REMEMBER that number is a float so it needs a .:\n")
+    " tive parameters and data types, REMEMBER that number is a float so it"
+    " needs a .:\n")
 
 EXAMPLES = (
     '\nExample 1:\nUser request: Greet Mary\nResult:\n{\n"prompt": "Greet Mary'
@@ -38,12 +37,13 @@ def main() -> None:
         state = src.jsonState
         vocab_path = model.get_path_to_vocab_file()
         with open(vocab_path, 'r', encoding='utf-8') as file:
-            vocab = json.load(file)
-        vocab_size = len(model.get_logits_from_input_ids(model.encode("x").tolist()[0]))
+            json.load(file)
+        vocab_size = len(model.get_logits_from_input_ids(model.encode(
+                         "x").tolist()[0]))
         id_to_token = {tid: model.decode(tid) for tid in range(vocab_size)}
 
         for i in prompts:
-            curr_prompt: str = f'{json.dumps(i.prompt)},\n' # non so se devo usare json.dumps
+            curr_prompt: str = f'{json.dumps(i.prompt)},\n'
             output: str = '{\n"prompt": ' + curr_prompt
             state_output: str = ''
             prompt: str = (MESSAGE + functs + EXAMPLES + REQUEST + i.prompt +
@@ -56,19 +56,23 @@ def main() -> None:
             used_params: list[str] = []
 
             while True:
-                best_tokenId = src.constrained_decoding(func_name, id_to_token, functs_data, current_state,
-                                                        param_name, inputIDs, model, state_output, i.prompt, used_params)
+                best_tokenId = src.constrained_decoding(
+                    func_name, id_to_token, functs_data, current_state,
+                    param_name, inputIDs, model, state_output, i.prompt,
+                    used_params)
                 token_str = model.decode(best_tokenId)
                 output += token_str
                 state_output += token_str
 
                 if current_state == state.AWAITING_NAME:
                     func_name = func_name + token_str
-                    func_name = func_name.replace(',', '').replace('"', '').replace('\n', '').strip()
+                    func_name = func_name.replace(',', '').replace(
+                        '"', '').replace('\n', '').strip()
 
                 if current_state == state.AWAITING_PARAMETERS_NAME:
                     param_name = param_name + token_str
-                    param_name = param_name.replace(',', '').replace('"', '').replace('\n', '').replace(':', '').strip()
+                    param_name = param_name.replace(',', '').replace(
+                        '"', '').replace('\n', '').replace(':', '').strip()
 
                 if current_state == state.AWAITING_CLOSING_BRACKET:
                     break
@@ -82,7 +86,7 @@ def main() -> None:
                     if new_state == state.AWAITING_PARAMETERS_NAME:
                         param_name = ''
                 current_state = new_state
-                print(output)
+                # print(output)
             print(output)
 
     except Exception as e:

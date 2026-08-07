@@ -21,7 +21,7 @@ def parsing_definition() -> str | None:
         with open("data/input/functions_definition.json",
                   encoding="utf-8") as file:
             f = file.read()
-            res_def = adapter.validate_json(f)
+            adapter.validate_json(f)
         print("json valido")
         return f
     except FileNotFoundError:

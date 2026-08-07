@@ -1,10 +1,10 @@
 NAME = call_me_maybe.py
 PYTHON = python3
-VENV = /sgoinfre/sfabi/.venv
+VENV = /sgoinfre/sadell-e/.venv
 BIN = $(VENV)/bin
-UV_CACHE_DIR = /sgoinfre/sfabi/uv-cache
-TMPDIR = /sgoinfre/sfabi/tmp
-HF_HOME = /sgoinfre/sfabi/hf
+UV_CACHE_DIR = /sgoinfre/sadell-e/uv-cache
+TMPDIR = /sgoinfre/sadell-e/tmp
+HF_HOME = /sgoinfre/sadell-e/hf
 HF_HUB_CACHE = $(HF_HOME)/hub
 HF_TOKEN = $(shell cat $(HOME)/.cache/huggingface/token 2>/dev/null)
 
